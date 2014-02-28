@@ -30,7 +30,7 @@ var Check = new Schema({
   uptime      : { type: Number, default: 0 },
   downtime    : { type: Number, default: 0 },
   qos         : {},
-  match       : String
+  pollerParams : Schema.Types.Mixed
 });
 Check.plugin(require('mongoose-lifecycle'));
 
@@ -39,6 +39,17 @@ Check.pre('remove', function(next) {
     next();
   });
 });
+
+Check.methods.setPollerParam = function(name, value) {
+  if (!this.pollerParams) this.pollerParams = {};
+  this.pollerParams[name] = value;
+  this.markModified('pollerParams');
+};
+
+Check.methods.getPollerParam = function(name) {
+  if (!this.pollerParams) return;
+  return this.pollerParams[name];
+};
 
 Check.methods.removePings = function(callback) {
   Ping.remove({ check: this._id }, callback);
@@ -131,7 +142,7 @@ Check.methods.mustNotifyEvent = function(status) {
       return false;
     }
     if (this.errorCount === this.alertTreshold) {
-      // enough down pings to trigger notofication
+      // enough down pings to trigger notification
       return true;
     }
     // error count higher than treshold, that means the alert was already sent
@@ -144,12 +155,12 @@ Check.methods.mustNotifyEvent = function(status) {
   }
   // check either goes up after less than alertTreshold down pings, or is already up for long
   return false;
-}
+};
 
 Check.methods.markEventNotified = function() {
   // increase error count to disable notification if the next ping has the same status
   this.errorCount = this.alertTreshold + 1;
-}
+};
 
 Check.methods.getQosPercentage = function() {
   if (!this.qos) return false;
@@ -303,6 +314,37 @@ Check.methods.getSingleStatForPeriod = function(period, date, callback) {
   });
 };
 
+Check.methods.populateFromDirtyCheck = function(dirtyCheck, pollerCollection) {
+  this.url = dirtyCheck.url || this.url;
+  this.maxTime = dirtyCheck.maxTime || this.maxTime;
+  this.isPaused = dirtyCheck.isPaused || this.isPaused;
+  this.alertTreshold = dirtyCheck.alertTreshold || this.alertTreshold;
+  this.interval = dirtyCheck.interval * 1000 || this.interval;
+
+  if (typeof(dirtyCheck.name) !== 'undefined' && dirtyCheck.name.length) {
+      this.name = dirtyCheck.name;
+  } else if (typeof(this.name) === 'undefined' || !this.name.length ) {
+      this.name = dirtyCheck.url;
+  }
+
+  if (typeof(dirtyCheck.tags) != 'undefined') {
+    this.tags = this.constructor.convertTags(dirtyCheck.tags);
+  }
+
+  if (typeof(this.url) == 'undefined') {
+    throw new Error('URL must be defined');
+  }
+
+  if (dirtyCheck.type) {
+    if (!pollerCollection.getForType(dirtyCheck.type).validateTarget(this.url)) {
+      throw new Error('URL ' + this.url + ' and poller type ' + dirtyCheck.type + ' mismatch');
+    }
+    this.type = dirtyCheck.type;
+  } else {
+    this.type = pollerCollection.guessTypeForUrl(this.url);
+  }
+};
+
 Check.statics.getAllTags = function(callback) {
   this.aggregate(
     { $unwind: "$tags" },
@@ -330,22 +372,6 @@ Check.statics.convertTags = function(tags) {
   return tags;
 };
 
-Check.statics.guessType = function(url) {
-  var type;
-
-  if (url.search(/^http:\/\//) != -1) {
-    type = 'http';
-  } else if (url.search(/^https:\/\//) != -1) {
-    type = 'https';
-  } else if (url.search(/^udp:\/\//) != -1) {
-    type = 'udp';
-  } else if (url.search(/^icmp:\/\//) != -1) {
-    type = 'icmp';
-  }
-
-  return type
-};
-
 /**
  * Calls a function for all checks that need to be polled.
  *
@@ -367,28 +393,9 @@ Check.statics.needingPoll = function() {
 
 Check.statics.updateAllQos = function(callback) {
   this.find({}).each(function (err, check) {
-    if(err || !check) return;
+    if (err || !check) return;
     check.updateQos(callback);
   });
-};
-
-/**
- * Sanitizes and validates a given string to check that
- * it can be transformed to a regexp
- */
-Check.statics.validateMatch = function(match) {
-  if (!match) return true;
-  if (match.indexOf('/') !== 0) {
-    match = '/' + match + '/';
-  }
-  var matchParts = match.match(new RegExp('^/(.*?)/(g?i?m?y?)$'));
-  try {
-    // check that the regexp doesn't crash
-    new RegExp(matchParts[1], matchParts[2]);
-  } catch (e) {
-    return false;
-  }
-  return match;
 };
 
 module.exports = mongoose.model('Check', Check);

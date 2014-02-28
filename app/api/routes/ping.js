@@ -27,22 +27,6 @@ module.exports = function(app) {
       res.json(pings);
     });
   });
-  
-  app.get('/pings/check/:id/:page?', function(req, res, next) {
-    Check.count({ _id: req.params.id }, function(err, nb_checks) {
-      if (err) return app.next(err);
-      if (!nb_checks) return res.json(404, { error: 'failed to load check ' + req.params.id });
-      Ping
-      .find({ check: req.params.id })
-      .sort({ timestamp: -1 })
-      .limit(50)
-      .skip((req.params.page - 1) * 50)
-      .exec(function(err, pings) {
-        if (err) return next(err);
-        res.json(pings);
-      });
-    });
-  });
 
   app.get('/pings/events', function(req, res, next) {
     CheckEvent
@@ -64,19 +48,19 @@ module.exports = function(app) {
         return res.send(err1.message, 500);
       }
       if (!check) {
-        return rest.send('Error: No existing check with id ' + req.body.checkId, 403);
+        return res.send('Error: No existing check with id ' + req.body.checkId, 403);
       }
       if (!check.needsPoll) {
         return res.send('Error: This check was already polled. No ping was created', 403);
       }
       var status = req.body.status === 'true';
-      Ping.createForCheck(status, req.body.timestamp, req.body.time, check, req.body.name, req.body.error, function(err2, ping) {
+      Ping.createForCheck(status, req.body.timestamp, req.body.time, check, req.body.name, req.body.error, req.body.details,  function(err2, ping) {
         if (err2) {
           return res.send(err2.message, 500);
         }
         res.json(ping);
       });
-    })
+    });
   });
 
 };

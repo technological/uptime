@@ -4,9 +4,25 @@ Uptime Changelog
 To be released
 --------------
 
+* Remove ICMP poller as it requires Uptime to be launched with root permissions to work
+* Add basicAuth plugin to restrict access to the API and dashboard apps using Basic Authentication
+* Upgrade moment.js to version 2.1
+* Add httpOptions plugin to allow setting custom headers or HTTP options to a check
+* Update the README about the plugin system
+* Update plugins system to make it easier to enable new plugins, just by adding a line in the configuration
+* Add pollerCollections to allow the addition of custom pollers
+* Update HTTP and HTTPS pollers (they now specialize a BaseHttpPoller, to reduce code duplication)
+* Fix monitor crash when poller is badly set
+* Update plugins to let them extend both the monitor and the webapp (warning: changes plugins signature)
+* Add architecture schema in the README
+* Update Dummy Target more to make it verbose on the console
+* Update Check model to store pollerParams
+* Update Ping model to store pollerDetails
+* Add new events to Monitor and dashboard app
+* Add more plugins extension points: they can now add details to checks, abilities to pollers, and store additional details about pings
 * Fix warnings in production by using cookie store for sessions
 * Add mention of external plugins in README
-* Add pattern detection in response body
+* Add patternMatcher plugin to allow pattern detection in response body
 * Fix bug allowing the creation of empty checks
 * Add Http Status 303 to allowed redirect Types
 * Fix "Cannot set property 'protocol' of undefined" error when running Uptime behind a proxy
@@ -60,7 +76,7 @@ To be released
 
 * This is the last release compatible with Node 0.6.
 * New events appear as such when watching event list
-* Added favicon. The favison turns red when at least one check is down.
+* Added favicon. The favicon turns red when at least one check is down.
 
 2012-08-05, v1.3
 ----------------
